@@ -74,7 +74,4 @@ public class RegistroPOJO {
     public void setDepartamento(String departamento) {
         this.departamento = departamento;
     }
-
-    
-
 }

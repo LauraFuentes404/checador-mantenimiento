@@ -33,6 +33,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.GregorianCalendar;
 import javax.swing.ImageIcon;
@@ -270,7 +271,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                     + " WHERE  tswhorarios_administrativo.cdia= ? AND tswhorarios_administrativo.cclaveadministrativo= ? ");
 
             horarioStmt.setInt(1, diaActual);
-            horarioStmt.setString(2, claveEmpleado);      
+            horarioStmt.setString(2, claveEmpleado);
             ResultSet rs = horarioStmt.executeQuery();
 
             while (rs.next()) {
@@ -296,48 +297,69 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
 
     public void registrarEntrada(int minutosActuales, RegistroPOJO obj) throws ParseException {
         Calendar c = Calendar.getInstance();
+        int numeroDeLaSemana = c.get(Calendar.WEEK_OF_YEAR);
+        int numDia = c.get(Calendar.DAY_OF_WEEK);
+        int diaActualFormato = cambiarFormatoDia(numDia);
         String estado = "";
-
+        int tipo = 0;
         int hora = convertirHora(obj.getRetardo());
         int minutos = convertirMinutos(obj.getRetardo());
         int entrada = buscarRegistroDeAsistencia(obj);
-        if (entrada == 0) {
-            if (obj.getRetardo().length() == 9 || obj.getRetardo().length() == 10 || obj.getRetardo().length() == 11) {
-                if (hora == 0 && minutos <= 30) { //asistencia
-                    estado = "A";
-                    insertAsistencia(obj, estado);
-                    JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                    clear();
-                    return;
+        System.out.println(obj.getDepartamento());
+        if (!"VELADOR".equals(obj.getDepartamento())) {
+            if (entrada == 0) {
+                if (obj.getRetardo().length() == 9 || obj.getRetardo().length() == 10 || obj.getRetardo().length() == 11) {
+                    if (hora == 0 && minutos <= 30) { //asistencia
+                        estado = "A";
+                        jpHoraRegistrada.setBackground(Color.GREEN);
+                        obj.setRetardo("00:00:00");
+                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
+                        clear();
+                        return;
+                    } else {
+                        JOptionPane.showMessageDialog(null, "Aun no puede registrar  el empleado  " + obj.getClaveEmpleado());
+                        clear();
+                        return;
+                    }
                 } else {
-                    JOptionPane.showMessageDialog(null, "Aun no puede registrar  el empleado  " + obj.getClaveEmpleado());
-                    clear();
-                    return;
+                    if (hora == 0 && minutos < 6) {
+                        jpHoraRegistrada.setBackground(Color.GREEN);
+                        estado = "A"; //asistencia
+                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+                        JOptionPane.showMessageDialog(null, "Se registro entrada del empleado " + obj.getClaveEmpleado());
+                        clear();
+                        return;
+
+                    } else if (hora == 0 && minutos >= 6 && hora == 0 && minutos <= 10) {
+                        jpHoraRegistrada.setBackground(Color.YELLOW);
+                        estado = "B"; //retardo
+                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
+                        clear();
+                        return;
+                    } else if (hora == 0 && minutos >= 11) {
+                        jpHoraRegistrada.setBackground(Color.LIGHT_GRAY);
+                        estado = "C"; //falta 
+                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
+                        clear();
+                        return;
+                    }
                 }
             } else {
-                if (hora == 0 && minutos < 6) {
-                    estado = "A"; //asistencia
-                    insertAsistencia(obj, estado);
-                    JOptionPane.showMessageDialog(null, "Se registro entrada del empleado " + obj.getClaveEmpleado());
-                    clear();
-                    return;
-
-                } else if (hora == 0 && minutos >= 6 && hora == 0 && minutos <= 10) {
-                    estado = "B"; //retardo
-                    insertAsistencia(obj, estado);
-                    JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                    clear();
-                    return;
-                } else if (hora == 0 && minutos >= 11) {
-                    estado = "C"; //falta 
-                    insertAsistencia(obj, estado);
-                    JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                    clear();
-                    return;
-                }
+                JOptionPane.showMessageDialog(null, "Ya registro entrada el empleado " + obj.getClaveEmpleado());
+                clear();
+                return;
             }
         } else {
-            JOptionPane.showMessageDialog(null, "Ya registro entrada el empleado " + obj.getClaveEmpleado());
+            /* este else es para que el velador registre cada hora su entrada, ya que es una forma de verificar que esten despiertos en la noche*/
+            estado = "A";
+            tipo = 1;
+            jpHoraRegistrada.setBackground(Color.GREEN);
+            obj.setRetardo("00:00:00");
+            insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+            JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
             clear();
             return;
         }
@@ -345,10 +367,9 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         JOptionPane.showMessageDialog(null, "Hoy no trabaja el empleado  " + obj.getClaveEmpleado());
         clear();
     }
-
     public void registrarSalida(String claveEmpleado) {
         RegistroPOJO obj = datosEmpleado(claveEmpleado);
-        String  fecha = buscarUltimaEntrada(claveEmpleado);
+        String fecha = buscarUltimaEntrada(claveEmpleado);
         updateAsistencia(obj, fecha);
     }
 
@@ -432,7 +453,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         try {
             PreparedStatement updateAsistenciaStmt = c.prepareStatement("UPDATE tswasistencia_administrativo "
                     + "	SET   chorasalida= ? "
-                    + "	WHERE   cclaveadministrativo= ?  AND  cfecha = '"+fecha+"' ;");
+                    + "	WHERE   cclaveadministrativo= ?  AND  cfecha = '" + fecha + "' ;");
 
             updateAsistenciaStmt.setString(1, horaSalida);
             updateAsistenciaStmt.setString(2, obj.getClaveEmpleado());
@@ -457,7 +478,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         }
     }
 
-    public void insertAsistencia(RegistroPOJO obj, String estado) {
+    public void insertAsistencia(RegistroPOJO obj, String estado, int tipo, int dia, int semana) {
         Date today = (Date) Calendar.getInstance().getTime();
         String fechaActual = formatter1.format(today);
         String horaActual = formatter2.format(today);
@@ -465,12 +486,15 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         try {
             PreparedStatement insertASistenciaStmt = c.prepareStatement(
                     "INSERT INTO tswasistencia_administrativo( "
-                    + "	cfecha,cclaveadministrativo, choraentrada,cminutos,cestado) "
-                    + "	VALUES ('" + fechaActual + "',?, ?, ?, ?)");
+                    + "	cfecha,cclaveadministrativo, choraentrada,cminutos,cestado,ctipo,cdia, csemana) "
+                    + "	VALUES ('" + fechaActual + "',?,?, ?, ?,?,?,?)");
             insertASistenciaStmt.setString(1, obj.getClaveEmpleado());
             insertASistenciaStmt.setString(2, horaActual);
             insertASistenciaStmt.setString(3, obj.getRetardo());
             insertASistenciaStmt.setString(4, estado);
+            insertASistenciaStmt.setInt(5, tipo);
+            insertASistenciaStmt.setInt(6, dia);
+            insertASistenciaStmt.setInt(7, semana);
             insertASistenciaStmt.executeUpdate();
             jlnombreadministrativo.setText(obj.getNombreEmpleado());
             jlclaveadministrativo.setText(obj.getClaveEmpleado());
@@ -485,6 +509,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
     }
 
     public void clear() {
+        jpHoraRegistrada.setBackground(Color.decode("#dedede"));
         jlEstado.setText("");
         jlnombreadministrativo.setText("");
         jlclaveadministrativo.setText("");
@@ -537,8 +562,11 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
     }
 
     public int cambiarFormatoDia(int dia) {
-        int diaCambio = 0;
+        int diaCambio = 6;
         switch (dia) {
+            case 1:
+                diaCambio = 6;
+                break;
             case 2:
                 diaCambio = 0;
                 break;
@@ -620,7 +648,6 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
     private void initComponents() {
 
         jldepartamento = new javax.swing.JLabel();
-        jlhoraRegistrada = new javax.swing.JLabel();
         label3 = new java.awt.Label();
         jLabel1 = new javax.swing.JLabel();
         jlclaveadministrativo = new javax.swing.JLabel();
@@ -640,12 +667,14 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         jLabel11 = new javax.swing.JLabel();
         jLabel7 = new javax.swing.JLabel();
         jlFechaSistema = new javax.swing.JLabel();
-        jlEstado = new javax.swing.JLabel();
         panelHuella = new java.awt.Panel();
         lblImagen = new javax.swing.JLabel();
         label2 = new java.awt.Label();
-        jLabel3 = new javax.swing.JLabel();
         jLabel4 = new javax.swing.JLabel();
+        jpHoraRegistrada = new javax.swing.JPanel();
+        jlEstado = new javax.swing.JLabel();
+        jlhoraRegistrada = new javax.swing.JLabel();
+        jLabel3 = new javax.swing.JLabel();
         jMenuBar1 = new javax.swing.JMenuBar();
         jMOpciones = new javax.swing.JMenu();
         jMIRegistrarUsuario = new javax.swing.JMenuItem();
@@ -664,8 +693,6 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         });
 
         jldepartamento.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
-
-        jlhoraRegistrada.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
 
         label3.setAlignment(java.awt.Label.CENTER);
         label3.setBackground(new java.awt.Color(12, 72, 106));
@@ -805,8 +832,6 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
-        jlEstado.setFont(new java.awt.Font("Tahoma", 0, 18)); // NOI18N
-
         panelHuella.setBackground(new java.awt.Color(153, 153, 153));
 
         lblImagen.setBackground(new java.awt.Color(255, 255, 255));
@@ -836,11 +861,38 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                 .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
         );
 
+        jLabel4.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
+        jLabel4.setText("Departamento:");
+
+        jlEstado.setFont(new java.awt.Font("Tahoma", 0, 18)); // NOI18N
+
+        jlhoraRegistrada.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
+
         jLabel3.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
         jLabel3.setText("Hora registrada:");
 
-        jLabel4.setFont(new java.awt.Font("Tahoma", 1, 18)); // NOI18N
-        jLabel4.setText("Departamento:");
+        javax.swing.GroupLayout jpHoraRegistradaLayout = new javax.swing.GroupLayout(jpHoraRegistrada);
+        jpHoraRegistrada.setLayout(jpHoraRegistradaLayout);
+        jpHoraRegistradaLayout.setHorizontalGroup(
+            jpHoraRegistradaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jpHoraRegistradaLayout.createSequentialGroup()
+                .addContainerGap()
+                .addComponent(jLabel3)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                .addComponent(jlhoraRegistrada)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                .addComponent(jlEstado)
+                .addGap(102, 102, 102))
+        );
+        jpHoraRegistradaLayout.setVerticalGroup(
+            jpHoraRegistradaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jpHoraRegistradaLayout.createSequentialGroup()
+                .addGap(0, 0, Short.MAX_VALUE)
+                .addGroup(jpHoraRegistradaLayout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jlEstado)
+                    .addComponent(jlhoraRegistrada)
+                    .addComponent(jLabel3)))
+        );
 
         jMOpciones.setText("Opciones");
 
@@ -863,29 +915,28 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addGap(26, 26, 26)
                 .addComponent(panelHuella, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
-                .addGap(38, 38, 38)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
-                        .addComponent(btnEntrada, javax.swing.GroupLayout.PREFERRED_SIZE, 271, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, layout.createSequentialGroup()
                         .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
+                        .addComponent(btnEntrada, javax.swing.GroupLayout.PREFERRED_SIZE, 271, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(29, 29, 29)
                         .addComponent(btnSalida, javax.swing.GroupLayout.PREFERRED_SIZE, 271, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addGap(30, 30, 30))
-                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, layout.createSequentialGroup()
+                        .addGap(22, 22, 22))
+                    .addGroup(layout.createSequentialGroup()
+                        .addGap(50, 50, 50)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(jLabel1)
                             .addComponent(jLabel13)
-                            .addComponent(jLabel4)
-                            .addComponent(jLabel3))
-                        .addGap(26, 26, 26)
+                            .addComponent(jLabel4))
+                        .addGap(38, 38, 38)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createSequentialGroup()
-                                .addComponent(jlhoraRegistrada)
-                                .addGap(18, 18, 18)
-                                .addComponent(jlEstado))
                             .addComponent(jlnombreadministrativo)
                             .addComponent(jlclaveadministrativo)
                             .addComponent(jldepartamento))
-                        .addContainerGap(javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
+                        .addContainerGap())
+                    .addGroup(layout.createSequentialGroup()
+                        .addGap(38, 38, 38)
+                        .addComponent(jpHoraRegistrada, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))))
             .addComponent(estadosHuella, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(jPanel2, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
             .addComponent(label3, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -895,34 +946,33 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
             .addGroup(layout.createSequentialGroup()
                 .addComponent(jPanel2, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addGap(1, 1, 1)
-                .addComponent(label3, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addComponent(label3, javax.swing.GroupLayout.PREFERRED_SIZE, 28, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
-                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(panelHuella, javax.swing.GroupLayout.Alignment.LEADING, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addGroup(layout.createSequentialGroup()
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                        .addComponent(jpHoraRegistrada, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
+                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addGroup(layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                    .addComponent(jLabel13)
-                                    .addComponent(jlnombreadministrativo))
-                                .addGap(24, 24, 24)
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                    .addComponent(jLabel1)
-                                    .addComponent(jlclaveadministrativo))
-                                .addGap(46, 46, 46))
-                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                .addComponent(jLabel4)
-                                .addComponent(jldepartamento)))
-                        .addGap(25, 25, 25)
+                                .addComponent(jlnombreadministrativo)
+                                .addGap(25, 25, 25)
+                                .addComponent(jlclaveadministrativo)
+                                .addGap(78, 78, 78))
+                            .addGroup(layout.createSequentialGroup()
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                    .addGroup(layout.createSequentialGroup()
+                                        .addComponent(jLabel13)
+                                        .addGap(24, 24, 24)
+                                        .addComponent(jLabel1)
+                                        .addGap(46, 46, 46))
+                                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                        .addComponent(jLabel4)
+                                        .addComponent(jldepartamento)))
+                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                .addComponent(jlhoraRegistrada)
-                                .addComponent(jlEstado))
-                            .addComponent(jLabel3))
-                        .addGap(25, 25, 25)
-                        .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                            .addComponent(btnEntrada, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)
-                            .addComponent(btnSalida, javax.swing.GroupLayout.Alignment.TRAILING, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE))))
+                            .addComponent(btnSalida, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)
+                            .addComponent(btnEntrada, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)))
+                    .addComponent(panelHuella, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE))
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
                 .addComponent(estadosHuella, javax.swing.GroupLayout.PREFERRED_SIZE, 24, javax.swing.GroupLayout.PREFERRED_SIZE)
                 .addContainerGap())
@@ -976,7 +1026,6 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
             int diaActual = calendar.get(Calendar.DAY_OF_WEEK);
             String horaMinutos = formatter5.format(today);
             int diaActualFormato = cambiarFormatoDia(diaActual);
-
             if ("".equals(claveEmpleadoActual)) {
                 JOptionPane.showMessageDialog(null, "Ingrese su huella",
                         "Mensaje", JOptionPane.INFORMATION_MESSAGE);
@@ -1097,6 +1146,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
     private javax.swing.JLabel jldepartamento;
     private javax.swing.JLabel jlhoraRegistrada;
     private javax.swing.JLabel jlnombreadministrativo;
+    private javax.swing.JPanel jpHoraRegistrada;
     private java.awt.Label label2;
     private java.awt.Label label3;
     private javax.swing.JLabel lblImagen;

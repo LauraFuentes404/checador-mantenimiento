@@ -59,11 +59,18 @@ public class ConnectionDAO {
         }
 
         try {
-
-            conn = DriverManager.getConnection("jdbc:postgresql://" + hostname + ":" + port + "/" + bdname, user, pass);
+            String url= "jdbc:postgresql://" + hostname + ":" + port + "/" + bdname;
+            System.out.println(url);
+            conn = DriverManager.getConnection(url, user, pass);
             System.out.println("Si se conecto");
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(null,e.getMessage()  ,
+            StringBuilder sb = new StringBuilder(e.toString());
+            for (StackTraceElement ste : e.getStackTrace()) {
+                sb.append("\n\tat ");
+                sb.append(ste);
+            }
+            String trace = sb.toString();
+            JOptionPane.showMessageDialog(null, trace,
                     "[ERROR]", JOptionPane.ERROR_MESSAGE);
             System.out.println("Error de Conexión");
             e.printStackTrace();
