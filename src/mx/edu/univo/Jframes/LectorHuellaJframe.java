@@ -33,7 +33,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.DateFormat;
 import java.text.ParseException;
 import java.util.GregorianCalendar;
 import javax.swing.ImageIcon;
@@ -43,9 +42,7 @@ import javax.swing.UIManager;
 import mx.edu.univo.POJOs.RegistroPOJO;
 import java.util.Date;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Iterator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.Timer;
@@ -258,31 +255,24 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
 
     ConnectionDAO con = new ConnectionDAO();
 
-    public RegistroPOJO extraerHorario(String claveEmpleado, int diaActual, String hora) {
+    public RegistroPOJO extraerHorario(String claveEmpleado) {
         Connection c = con.conectar();
         RegistroPOJO obj = null;
 
         try {
-            PreparedStatement horarioStmt = c.prepareStatement("SELECT(to_timestamp(CURRENT_DATE || ' ' || '" + hora + "', 'YYYY-MM-DD HH24:mi:ss') -to_timestamp(CURRENT_DATE || ' ' || tswhorarios_administrativo.chora_entrada, 'YYYY-MM-DD HH24:mi:ss')) AS tiempo_restante, "
-                    + " tswhorarios_administrativo.chora_entrada,  tswhorarios_administrativo.chora_salida, tswhorarios_administrativo.cdia, "
-                    + " tswhuella_administrativo.cnombrecompleto, tswhuella_administrativo.cdepartamento "
-                    + " FROM tswhorarios_administrativo "
-                    + " INNER JOIN tswhuella_administrativo  ON tswhuella_administrativo.cclaveadministrativo= tswhorarios_administrativo.cclaveadministrativo "
-                    + " WHERE  tswhorarios_administrativo.cdia= ? AND tswhorarios_administrativo.cclaveadministrativo= ? ");
+            PreparedStatement horarioStmt = c.prepareStatement( "Select cnombrecompleto,cdepartamento"
+                    + " FROM tswdatos_administrativo "
+                    + " WHERE cclaveadministrativo= ? ");
 
-            horarioStmt.setInt(1, diaActual);
-            horarioStmt.setString(2, claveEmpleado);
+            horarioStmt.setString(1, claveEmpleado);
+            System.out.println(horarioStmt);
             ResultSet rs = horarioStmt.executeQuery();
 
             while (rs.next()) {
                 obj = new RegistroPOJO();
                 obj.setClaveEmpleado(claveEmpleado);
                 obj.setNombreEmpleado(rs.getString("cnombrecompleto"));
-                obj.setDia(rs.getInt("cdia"));
                 obj.setDepartamento(rs.getString("cdepartamento"));
-                obj.setHoraEntrada(rs.getString("chora_entrada"));
-                obj.setHoraSalida(rs.getString("chora_salida"));
-                obj.setRetardo(rs.getString("tiempo_restante"));
             }
             if (obj == null) {
                 JOptionPane.showMessageDialog(null, "Hoy no trabaja el empleado " + claveEmpleado, "Error", JOptionPane.ERROR_MESSAGE);
@@ -295,58 +285,24 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         return obj;
     }
 
-    public void registrarEntrada(int minutosActuales, RegistroPOJO obj) throws ParseException {
+    public void registrarEntrada(RegistroPOJO obj) throws ParseException {
         Calendar c = Calendar.getInstance();
         int numeroDeLaSemana = c.get(Calendar.WEEK_OF_YEAR);
         int numDia = c.get(Calendar.DAY_OF_WEEK);
         int diaActualFormato = cambiarFormatoDia(numDia);
         String estado = "";
         int tipo = 0;
-        int hora = convertirHora(obj.getRetardo());
-        int minutos = convertirMinutos(obj.getRetardo());
         int entrada = buscarRegistroDeAsistencia(obj);
         System.out.println(obj.getDepartamento());
         if (!"VELADOR".equals(obj.getDepartamento())) {
             if (entrada == 0) {
-                if (obj.getRetardo().length() == 9 || obj.getRetardo().length() == 10 || obj.getRetardo().length() == 11) {
-                    if (hora == 0 && minutos <= 30) { //asistencia
-                        estado = "A";
-                        jpHoraRegistrada.setBackground(Color.GREEN);
-                        obj.setRetardo("00:00:00");
-                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
-                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                        clear();
-                        return;
-                    } else {
-                        JOptionPane.showMessageDialog(null, "Aun no puede registrar  el empleado  " + obj.getClaveEmpleado());
-                        clear();
-                        return;
-                    }
-                } else {
-                    if (hora == 0 && minutos < 6) {
-                        jpHoraRegistrada.setBackground(Color.GREEN);
-                        estado = "A"; //asistencia
-                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
-                        JOptionPane.showMessageDialog(null, "Se registro entrada del empleado " + obj.getClaveEmpleado());
-                        clear();
-                        return;
 
-                    } else if (hora == 0 && minutos >= 6 && hora == 0 && minutos <= 10) {
-                        jpHoraRegistrada.setBackground(Color.YELLOW);
-                        estado = "B"; //retardo
-                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
-                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                        clear();
-                        return;
-                    } else if (hora == 0 && minutos >= 11) {
-                        jpHoraRegistrada.setBackground(Color.LIGHT_GRAY);
-                        estado = "C"; //falta 
-                        insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
-                        JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
-                        clear();
-                        return;
-                    }
-                }
+                estado = "A";
+                jpHoraRegistrada.setBackground(Color.GREEN);
+                insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
+                JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
+                clear();
+                return;
             } else {
                 JOptionPane.showMessageDialog(null, "Ya registro entrada el empleado " + obj.getClaveEmpleado());
                 clear();
@@ -357,20 +313,25 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
             estado = "A";
             tipo = 1;
             jpHoraRegistrada.setBackground(Color.GREEN);
-            obj.setRetardo("00:00:00");
             insertAsistencia(obj, estado, tipo, diaActualFormato, numeroDeLaSemana);
             JOptionPane.showMessageDialog(null, "Se registro entrada " + obj.getClaveEmpleado());
             clear();
             return;
         }
 
-        JOptionPane.showMessageDialog(null, "Hoy no trabaja el empleado  " + obj.getClaveEmpleado());
-        clear();
     }
+
     public void registrarSalida(String claveEmpleado) {
         RegistroPOJO obj = datosEmpleado(claveEmpleado);
         String fecha = buscarUltimaEntrada(claveEmpleado);
-        updateAsistencia(obj, fecha);
+        if (fecha != "prueba") {
+            updateAsistencia(obj, fecha);
+
+        } else {
+            JOptionPane.showMessageDialog(null, "El usuario "+claveEmpleado+ " ya registro salida");
+             clear();
+        }
+
     }
 
     public String buscarUltimaEntrada(String claveEmpleado) {
@@ -383,6 +344,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
             PreparedStatement buscarEntradaStmt = c.prepareStatement("SELECT cfecha FROM tswasistencia_administrativo WHERE "
                     + " cclaveadministrativo = ? AND  chorasalida IS NULL ORDER BY cfecha DESC LIMIT 1");
             buscarEntradaStmt.setString(1, claveEmpleado);
+            System.out.println(buscarEntradaStmt);
             ResultSet rs = buscarEntradaStmt.executeQuery();
             while (rs.next()) {
                 horaDeEntrada = rs.getString("cfecha");
@@ -425,7 +387,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
         Connection c = con.conectar();
         RegistroPOJO obj = null;
         try {
-            PreparedStatement buscarEmpleadoStmt = c.prepareStatement("SELECT cdepartamento, cnombrecompleto FROM tswhuella_administrativo WHERE  "
+            PreparedStatement buscarEmpleadoStmt = c.prepareStatement("SELECT cdepartamento, cnombrecompleto FROM tswdatos_administrativo WHERE  "
                     + "cclaveadministrativo= ?");
             buscarEmpleadoStmt.setString(1, claveEmpleado);
             ResultSet rs = buscarEmpleadoStmt.executeQuery();
@@ -490,7 +452,7 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                     + "	VALUES ('" + fechaActual + "',?,?, ?, ?,?,?,?)");
             insertASistenciaStmt.setString(1, obj.getClaveEmpleado());
             insertASistenciaStmt.setString(2, horaActual);
-            insertASistenciaStmt.setString(3, obj.getRetardo());
+            insertASistenciaStmt.setString(3, "00:00:00");
             insertASistenciaStmt.setString(4, estado);
             insertASistenciaStmt.setInt(5, tipo);
             insertASistenciaStmt.setInt(6, dia);
@@ -956,19 +918,17 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                             .addGroup(layout.createSequentialGroup()
                                 .addComponent(jlnombreadministrativo)
                                 .addGap(25, 25, 25)
-                                .addComponent(jlclaveadministrativo)
-                                .addGap(78, 78, 78))
-                            .addGroup(layout.createSequentialGroup()
-                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                                    .addGroup(layout.createSequentialGroup()
-                                        .addComponent(jLabel13)
-                                        .addGap(24, 24, 24)
-                                        .addComponent(jLabel1)
-                                        .addGap(46, 46, 46))
-                                    .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
-                                        .addComponent(jLabel4)
-                                        .addComponent(jldepartamento)))
-                                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)))
+                                .addComponent(jlclaveadministrativo))
+                            .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
+                                .addGroup(layout.createSequentialGroup()
+                                    .addComponent(jLabel13)
+                                    .addGap(24, 24, 24)
+                                    .addComponent(jLabel1)
+                                    .addGap(46, 46, 46))
+                                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                                    .addComponent(jLabel4)
+                                    .addComponent(jldepartamento))))
+                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                         .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                             .addComponent(btnSalida, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)
                             .addComponent(btnEntrada, javax.swing.GroupLayout.PREFERRED_SIZE, 97, javax.swing.GroupLayout.PREFERRED_SIZE)))
@@ -1031,9 +991,9 @@ public class LectorHuellaJframe extends javax.swing.JFrame {
                         "Mensaje", JOptionPane.INFORMATION_MESSAGE);
                 reiniciarLectura();
             } else {
-                RegistroPOJO horario = extraerHorario(claveEmpleadoActual, diaActualFormato, horaMinutos);
+                RegistroPOJO horario = extraerHorario(claveEmpleadoActual);
                 if (horario != null) {
-                    registrarEntrada(diaActualFormato, horario);
+                    registrarEntrada(horario);
                     reiniciarLectura();
                     cerrarSesion();
                 }

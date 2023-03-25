@@ -9,11 +9,7 @@ package mx.edu.univo.DAO;
  *
  * @author Laura
  */
-import java.io.BufferedReader;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -59,10 +55,8 @@ public class ConnectionDAO {
         }
 
         try {
-            String url= "jdbc:postgresql://" + hostname + ":" + port + "/" + bdname;
-            System.out.println(url);
+            String url = "jdbc:postgresql://" + hostname + ":" + port + "/" + bdname;
             conn = DriverManager.getConnection(url, user, pass);
-            System.out.println("Si se conecto");
         } catch (SQLException e) {
             StringBuilder sb = new StringBuilder(e.toString());
             for (StackTraceElement ste : e.getStackTrace()) {
@@ -71,10 +65,8 @@ public class ConnectionDAO {
             }
             String trace = sb.toString();
             JOptionPane.showMessageDialog(null, trace,
-                    "[ERROR]", JOptionPane.ERROR_MESSAGE);
-            System.out.println("Error de Conexión");
+                    "[ERROR]: De parte del servidor notificar a SISE, ", JOptionPane.ERROR_MESSAGE);
             e.printStackTrace();
-
         }
 
         if (conn != null) {
